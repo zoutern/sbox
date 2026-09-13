@@ -1,0 +1,20 @@
+services:
+  sbox:
+    image: ghcr.io/zotenr/sbox:latest
+    container_name: sbox
+    restart: always
+    ports:
+      - "2022:2022"   # sshd
+      - "3321:2052"   # vless-ws 直连(明文,测试用)
+      - "3000:3000"   # 订阅服务
+    environment:
+      SSH_ENABLED: "true"
+      SSH_PORT: "2022"
+      SSH_PUBLIC_KEY: ""            # ssh-ed25519 AAAA... 你的公钥
+      # CLFL_TOKEN: ""              # 可选:官方cloudflared隧道(如SSH接入)
+      UUID: ""                      # 留空自动生成
+      # CF_TOKEN: ""                # 可选:sbox内置隧道
+      # CF_DOMAIN: ""
+      VLESS_PORT: "2052"
+      FILE_PATH: "/var/lib/sbox"
+      SHOW_LOG: "true"

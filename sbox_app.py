@@ -294,9 +294,7 @@ def run_nezha():
 # =========================== 启动 sbox ===========================
 def run_sbox(binpath):
     global sbox_proc
-    sbox_proc = subprocess.Popen([binpath, 'run', '-D', str(FILE_PATH), '-c', str(config_path)],
-                                 stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL,
-                                 start_new_session=True)
+    sbox_proc = subprocess.Popen([binpath, 'run', '-D', str(FILE_PATH), '-c', str(config_path)])  # 留在supervisor进程组内
     log(f'sbox 已启动 (pid {sbox_proc.pid})')
     time.sleep(4)
     if sbox_proc.poll() is not None:
@@ -469,16 +467,38 @@ def clean_files():
 class Handler(BaseHTTPRequestHandler):
     def do_GET(self):
         path = urllib.parse.urlparse(self.path).path
+
         if path == f'/{SUB_PATH}':
             self.send_response(200)
             self.send_header('Content-Type', 'text/plain; charset=utf-8')
             self.end_headers()
             self.wfile.write(sub_txt_content.encode())
+
         elif path == '/':
-            self.send_response(200)
-            self.send_header('Content-Type', 'text/html; charset=utf-8')
-            self.end_headers()
-            self.wfile.write(f'Hello! 访问 /{SUB_PATH} 获取订阅'.encode())
+            base_dir = os.path.dirname(os.path.abspath(__file__))
+            html_files = [f for f in os.listdir(base_dir) if f.lower().endswith('.html')]
+
+            if html_files:
+                # 优先 index.html，否则取第一个
+                if 'index.html' in html_files:
+                    chosen = 'index.html'
+                else:
+                    chosen = sorted(html_files)[0]
+
+                with open(os.path.join(base_dir, chosen), 'rb') as f:
+                    content = f.read()
+
+                self.send_response(200)
+                self.send_header('Content-Type', 'text/html; charset=utf-8')
+                self.send_header('Content-Length', str(len(content)))
+                self.end_headers()
+                self.wfile.write(content)
+            else:
+                self.send_response(404)
+                self.send_header('Content-Type', 'text/plain; charset=utf-8')
+                self.end_headers()
+                self.wfile.write(b'no html file found')
+
         else:
             self.send_response(404)
             self.end_headers()
@@ -528,6 +548,13 @@ def start_server():
     upload_nodes()
     add_visit_task()
     clean_files()
+
+def watch_sbox():
+    while sbox_proc is not None and sbox_proc.poll() is None:
+        time.sleep(10)
+    if sbox_proc is not None:
+        log_error('watchdog: sbox 进程已退出, 结束本进程交由 supervisor 整体重启')
+        os._exit(1)
 
 def main():
     signal.signal(signal.SIGINT, stop_all)
